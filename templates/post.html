@@ -39,17 +39,26 @@
             {{wtf.quick_form(form, button_map={"submit":"primary"})}}
                       {{ckeditor.load()}}
                       {{ckeditor.config(name="comment")}}
+
               <ul class="commentList">
+                  {% for comment in comments: %}
                 <li>
                     <div class="commenterImage">
-                      <img src="https://pbs.twimg.com/profile_images/744849215675838464/IH0FNIXk.jpg"/>
+<!--                      -->
+                      <img src="{{ comment.comment_author.email | gravatar }}"/>
                     </div>
+
                     <div class="commentText">
 
-                      <span class="date sub-text">{{user.name}}</span>
+                      {{comment.text|safe}}
+
+                      <span class="date sub-text">{{comment.comment_author.name}}</span>
                     </div>
+
                 </li>
+                  {% endfor %}
               </ul>
+
             </div>
 
 

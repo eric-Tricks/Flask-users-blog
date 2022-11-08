@@ -13,14 +13,22 @@ import os
 from functools import wraps
 
 app = Flask(__name__)
-app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY')
+app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY', '8BYkEfBA6O6donzWlSihBXox7C0sKR6b')
 ckeditor = CKEditor(app)
 Bootstrap(app)
 login_manager = LoginManager()
 login_manager.init_app(app)
+gravatar = Gravatar(app,
+                    size=100,
+                    rating='g',
+                    default='retro',
+                    force_default=False,
+                    force_lower=False,
+                    use_ssl=False,
+                    base_url=None)
 
 ##CONNECT TO DB
-app.config['SQLALCHEMY_DATABASE_URI'] = os.environ.get("DATABASE_URL","sqlite:///blog.db")
+app.config['SQLALCHEMY_DATABASE_URI'] = os.environ.get("DATABASE_URL", "sqlite:///blog.db")
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 db = SQLAlchemy(app)
 
@@ -36,6 +44,9 @@ class User(UserMixin, db.Model):
     # This will act like a List of BlogPost objects attached to each User.
     # The "author" refers to the author property in the BlogPost class.
     posts = relationship("BlogPost", back_populates="author")
+    # *******Add parent relationship*******#
+    # "comment_author" refers to the comment_author property in the Comment class.
+    comments = relationship("Comment", back_populates="comment_author")
 
 
 class BlogPost(db.Model):
@@ -51,6 +62,23 @@ class BlogPost(db.Model):
     author_id = db.Column(db.Integer, db.ForeignKey("users.id"))
     # Create reference to the User object, the "posts" refers to the posts protperty in the User class.
     author = relationship("User", back_populates="posts")
+
+    # ***************Parent Relationship*************#
+    comments = relationship("Comment", back_populates="parent_post")
+
+
+class Comment(db.Model):
+    __tablename__ = "comments"
+    id = db.Column(db.Integer, primary_key=True)
+    text = db.Column(db.Text, nullable=False)
+
+    # *******Add child relationship*******#
+    # "users.id" The users refers to the tablename of the Users class.
+    # "comments" refers to the comments property in the User class.
+    author_id = db.Column(db.Integer, db.ForeignKey("users.id"))
+    comment_author = relationship("User", back_populates="comments")
+    post_id = db.Column(db.Integer, db.ForeignKey("blog_posts.id"))
+    parent_post = relationship("BlogPost", back_populates="comments")
 
 
 db.create_all()
@@ -127,11 +155,25 @@ def logout():
     return redirect(url_for('get_all_posts'))
 
 
-@app.route("/post/<int:post_id>")
+@app.route("/post/<int:post_id>", methods=["POST", "GET"])
 def show_post(post_id):
     comment_form = CommentForm()
     requested_post = BlogPost.query.get(post_id)
-    return render_template("post.html", post=requested_post,form=comment_form, user=current_user)
+    if current_user.is_authenticated:
+        if comment_form.validate_on_submit():
+            comment = Comment(text=comment_form.comment.data,
+                              comment_author=current_user,
+                              parent_post=requested_post
+                              )
+            db.session.add(comment)
+            db.session.commit()
+            all_comments = Comment.query.all()
+            return render_template("post.html", comments=all_comments,post=requested_post, form=comment_form, user=current_user)
+    else:
+        flash("You need to be logged in to comment")
+        return redirect(url_for("login"))
+
+    return render_template("post.html", post=requested_post, form=comment_form, user=current_user)
 
 
 @app.route("/about")
