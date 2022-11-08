@@ -159,6 +159,7 @@ def logout():
 def show_post(post_id):
     comment_form = CommentForm()
     requested_post = BlogPost.query.get(post_id)
+    all_comments = Comment.query.all()
     if current_user.is_authenticated:
         if comment_form.validate_on_submit():
             comment = Comment(text=comment_form.comment.data,
@@ -167,7 +168,7 @@ def show_post(post_id):
                               )
             db.session.add(comment)
             db.session.commit()
-            all_comments = Comment.query.all()
+
             return render_template("post.html", comments=all_comments,post=requested_post, form=comment_form, user=current_user)
     else:
         flash("You need to be logged in to comment")
